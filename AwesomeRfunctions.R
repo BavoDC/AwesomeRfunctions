@@ -4,6 +4,14 @@
 #                                                                     #
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
+# source can be used to load the functions
+# myurl = "https://raw.githubusercontent.com/BavoDC/AwesomeRfunctions/master/AwesomeRfunctions.R"
+# z     = tempfile()
+# download.file(myurl, z, mode = "wb")
+# source(z)
+
+
+
 # the functions in this document are copied and/or modified functions found on stackoverflow or self-written functions
 
 #===========================#
