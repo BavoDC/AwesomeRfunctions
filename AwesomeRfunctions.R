@@ -311,17 +311,31 @@ dmed2.outc <- function(var,by.var,data){
   X2
 }
 
-dcont.outc <- function(var,by.var,data){
+dcont.outc <- function(var,by.var,data, digits = options()$digits){
   argz <- as.list(match.call())[-1]
-  if(!is.data.frame(data)) stop("Must be dataframe")
-  if(length(argz)!=3) stop("Provide all arguments of the function!")
+  if(!is.data.frame(data)) 
+    stop("Must be dataframe")
   
   data$var <- eval(argz$var,data)
   data$by.var <- eval(argz$by.var,data)
-  results <- aggregate(data$var,list(data$by.var),descr.cont)
+  results <- aggregate(data$var,list(data$by.var), descr.cont, digits = digits)
   X <- results
   X2 <- cbind(X[[ncol(X)]])
   rownames(X2) <- X[,1]; colnames(X2) <- "Mean (Standard Deviation)"
+  X2
+}
+
+dmedIQR.outc <- function(var,by.var,data, digits = options()$digits){
+  argz <- as.list(match.call())[-1]
+  if(!is.data.frame(data))
+    stop("Must be dataframe")
+  
+  data$var <- eval(argz$var,data)
+  data$by.var <- eval(argz$by.var,data)
+  results <- aggregate(data$var,list(data$by.var), descr.medianIQR, digits = digits)
+  X <- results
+  X2 <- cbind(X[[ncol(X)]])
+  rownames(X2) <- X[,1]; colnames(X2) <- c("Median (IQR)")
   X2
 }
 
