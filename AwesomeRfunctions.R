@@ -10,160 +10,128 @@
 # download.file(myurl, z, mode = "wb")
 # source(z)
 
+# the functions in this document are copied and/or modified functions found on
+# stackoverflow or self-written functions
 
+#### 1. Public functions ####
 
-# the functions in this document are copied and/or modified functions found on stackoverflow or self-written functions
-
-#===========================#
-# XLSX WITH MULTIPLE SHEETS #
-#===========================#
-save.xlsx <- function (path, ...)
-{
-  require(xlsx, quietly = TRUE)
-  objects <- list(...)
-  if(any(sapply(objects, class)=="list")) stop("Objects of type list are not permitted in this function.")
-  fargs <- as.list(match.call(expand.dots = TRUE))
-  objnames <- as.character(fargs)[-c(1, 2)]
-  nobjects <- length(objects)
-  for (i in 1:nobjects) {
-    if (i == 1)
-      write.xlsx(objects[[i]], path, sheetName = objnames[i], row.names = F)
-    else write.xlsx(objects[[i]], path, sheetName = objnames[i],
-                    append = TRUE, row.names = F)
-  }
-  print(paste("Workbook", path, "has", nobjects, "worksheets."))
-}
-
-# when object is of type list
-save.excel.list <- function(.list, default = 'var1', path = getwd(),name.path=T,begin=1,end=31,row.names=F,
-                            col.width=5.1E3){
-  require("XLConnect",quietly = T)
-  .name <- as.list(match.call())[2]
-  if(isTRUE(name.path)){
-    wb_name <- path
-  }else{
-    if(is.language(.name[[1]])) wb_name <- paste0(paste0(path, default, collapse = '/'), '.xlsx')
-    if(is.symbol(.name[[1]])) wb_name <- paste0(paste0(path, as.character(.name), collapse = '/'), '.xlsx')
-  }
-  
-  wb <- XLConnect::loadWorkbook(wb_name, create = TRUE)
-  
-  if(isTRUE(row.names)) them.names <- lapply(.list,function(x){c("",rownames(x))})
-  
-  # sheet names
-  sheet.names <- substr(names(.list),begin,end)
-  if(length(unique(sheet.names)) < length(sheet.names)){
-    for(i in sheet.names){
-      if(length(which(i == sheet.names))>1){
-        NrSheets = which(i == sheet.names)
-        SheetyName = paste(substr(i, 1, 30), 1:length(NrSheets), sep="")
-        sheet.names[which(i == sheet.names)] = SheetyName
-      }
-    }
-  }
-  
-  XLConnect::createSheet(wb, sheet.names)
-  
-  if(isTRUE(row.names)){
-    XLConnect::writeWorksheet(wb,.list, sheet.names,header=T,rownames = them.names)
-  }else{
-    XLConnect::writeWorksheet(wb,.list, sheet.names,header=T)
-  }
-  
-  for(i in sheet.names){
-    if(!is.null(dim(ncol(.list[[which(i == sheet.names)]])))){
-      nr.cols <- ncol(.list[[which(i == sheet.names)]])+1
-    }else{nr.cols <- length(.list[[which(i == sheet.names)]])}
-    XLConnect::setColumnWidth(wb, sheet=i,column = 1:nr.cols,width = col.width)
-  }
-  
-  XLConnect::saveWorkbook(wb)
-}
-
-#====================================#
-# Open all sheets excel file in list #
-#====================================#
-read_excel_allsheets <- function(filename) {
-  if(!any(grepl("readxl",names(sessionInfo()$otherPkgs)))) require(readxl,quietly = T)
-  sheets <- readxl::excel_sheets(filename)
-  x <-    lapply(sheets, function(X){
-    File = read_excel2(filename, sheet = X)
-    if(any(class(File)=="tbl")) File = as.data.frame(File)
-    File
-  })
-  names(x) <- sheets
-  x
-}
-
-# Transform object to dataframe if tibble #Goddamnit
-read_excel2 <- function(path, ...){
-  if(!(any(grepl("readxl", names(sessionInfo()$otherPkgs))))) require(readxl, quietly = T)
-  Df = read_excel(path, ...)
-  if(any(class(Df)=="tbl")) Df = as.data.frame(Df)
-  Df
-}
-
-
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-#    AWESOME FUNCTION TO GET OBJECTS WD     #
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### 1.1 Functions related to working directory ####
 .ls.objects <- function (pos = 1, pattern, order.by,
-                         decreasing=FALSE, head=FALSE, n=5) {
+                         decreasing = FALSE, head = FALSE, n = 5, UnitsObj = "Mb",
+                         DigitsSize = 3,
+                         ...) {
   napply <- function(names, fn) sapply(names, function(x)
     fn(get(x, pos = pos)))
-  names <- ls(pos = pos, pattern = pattern)
+  ObjSize <- function(x) format(object.size(x), units = "Mb", digits = DigitsSize, quote = F)
+  names <- ls(pos = pos, pattern = pattern, ...)
   obj.class <- napply(names, function(x) as.character(class(x))[1])
   obj.mode <- napply(names, mode)
   obj.type <- ifelse(is.na(obj.class), obj.mode, obj.class)
-  obj.size <- napply(names, object.size)
+  obj.size <- napply(names, ObjSize)
   obj.dim <- t(napply(names, function(x)
     as.numeric(dim(x))[1:2]))
   vec <- is.na(obj.dim)[, 1] & (obj.type != "function")
   obj.dim[vec, 1] <- napply(names, length)[vec]
   out <- data.frame(obj.type, obj.size, obj.dim)
   names(out) <- c("Type", "Size", "Rows", "Columns")
+  if (!missing(order.by)) {
+    if(order.by != "Size") {
+      out <- out[order(out[[order.by]], decreasing=decreasing), ]
+    } else if(order.by == "Size") {
+      out <- out[order(napply(names, object.size), decreasing=decreasing), ]
+    }
+  }
+  if (head)
+    out <- head(out, n)
+  out
+}
+
+.ls.objects2 <- function (pos = 1, pattern, order.by,
+                          decreasing=FALSE, head=FALSE, n=5) {
+  napply <- function(names, fn) sapply(names, function(x)
+    fn(get(x, pos = pos)))
+  names <- ls(pos = pos, pattern = pattern)
+  obj.class <- napply(names, function(x) as.character(class(x))[1])
+  obj.mode <- napply(names, mode)
+  obj.type <- ifelse(is.na(obj.class), obj.mode, obj.class)
+  obj.prettysize <- napply(names, function(x) {
+    format(utils::object.size(x), units = "auto") })
+  obj.size <- napply(names, object.size)
+  obj.dim <- t(napply(names, function(x)
+    as.numeric(dim(x))[1:2]))
+  vec <- is.na(obj.dim)[, 1] & (obj.type != "function")
+  obj.dim[vec, 1] <- napply(names, length)[vec]
+  out <- data.frame(obj.type, obj.size, obj.prettysize, obj.dim)
+  names(out) <- c("Type", "Size", "PrettySize", "Length/Rows", "Columns")
   if (!missing(order.by))
     out <- out[order(out[[order.by]], decreasing=decreasing), ]
   if (head)
     out <- head(out, n)
   out
 }
+
 # shorthand
 lsos <- function(..., n=10) {
   .ls.objects(..., order.by="Size", decreasing=TRUE, head=TRUE, n=n)
 }
 
+RmAll <- function() rm(list = ls(pos = 1), pos = 1)
 
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-# TOO LAZY TO USE FILE EXPLORER #
-#       ~~ SIMSALABIM ~~        #
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+RmJunk <- function(){
+  if (length(ls(pos = 1)) == 0)
+    stop("Nothing to be found in your environment.")
+  Fntions = .ls.objects(order.by = "Type")
+  Fntions = rownames(Fntions)[Fntions$Type == "function"]
+  rm(list = ls(pos = 1)[!ls(pos = 1) %in% Fntions], pos = 1)
+  cat("#", rep("-", 18), "#\n")
+  cat("# Your environment has been cleaned!  #\n")
+  cat("#", rep("-", 18), "#\n")
+  invisible(gc())
+}
 
-opendir <- function(dir = getwd()){
-  if (.Platform['OS.type'] == "windows"){
-    shell.exec(dir)
-  } else {
-    system(paste(Sys.getenv("R_BROWSER"), dir))
+RmType <- function(Types, AdjOpenMessage = F, Keep = NULL,
+                   GarbColl = T) {
+  if(!is.character(Types))
+    stop("Type has to be of type character.")
+  ObjEnv  = .ls.objects()
+  if(!any(ObjEnv$Type %in% Types))
+    warning(paste0("No objects of class ", Types, " found."))
+  
+  RmObj   = rownames(ObjEnv[ObjEnv$Type %in% Types, ])
+  if(!is.null(Keep))
+    RmObj = RmObj[!RmObj %in% Keep]
+  if("function" %in% Types & !AdjOpenMessage)
+    warning("Start and end message R are not adjusted !!!")
+  if(AdjOpenMessage)
+    AdjOpenR()
+  rm(list = ls(pos = 1)[ls(pos = 1) %in% RmObj], pos = 1)
+  if(GarbColl) {
+    cat("\n\nCollecting garbage\n\n")
+    invisible(gc())
   }
 }
 
-#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@#
-#    Functions to make life easier    #
-#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@#
 
+#### 1.2 Making life easier ####
 rm.NArows <- function(data){
-  if(!is.data.frame(data)) stop("Only objects of type dataframe are allowed!")
-  data[!apply(data,1,function(x){all(is.na(x))}),]
+  if (!is.data.frame(data))
+    stop("Only objects of type dataframe are allowed!")
+  data[!apply(data, 1, function(x) {
+    all(is.na(x))
+  }), ]
 }
 
 rm.NAcols <- function(data){
-  if(!is.data.frame(data)) stop("Only objects of type dataframe are allowed!")
-  data[,!apply(data,2,function(x){all(is.na(x))})]
+  if (!is.data.frame(data))
+    stop("Only objects of type dataframe are allowed!")
+  data[, !apply(data, 2, function(x) {
+    all(is.na(x))
+  })]
 }
 
-allNA <- function(x){
-  if(!is.null(dim(x))) stop("Only vectors allowed")
+allNA <- function(x) {
+  if (!is.null(dim(x)))
+    stop("Only vectors allowed")
   all(is.na(x))
 }
 
@@ -171,14 +139,23 @@ AnyAllNArows <- function(x) any(apply(x, 1, allNA))
 
 sumNA <- function(x) sum(is.na(x))
 
-ListToVector <- function(x){
-  if(!is.list(x)) stop("Function is only to be used with objects of type list!")
+ListToVector <- function(x, KeepNULL = T) {
+  if (!is.list(x))
+    stop("Function is only to be used with objects of type list!")
+  if (KeepNULL & any(unlist(lapply(x, is.null))))
+    x[unlist(lapply(x, is.null))] = NA
   unname(unlist(x))
 }
 
+NrUnique <- function(x, na.rm = T) {
+  if (na.rm)
+    length(unique(na.omit(x)))
+  else
+    length(unique(x))
+}
 
-# REMOVE NULL ENTRIES IN A LIST #
-
+ShowAllDecs <- function(x) sprintf("%.54f", x)
+SeqLength <- function(x) seq_len(length(x))
 
 is.NullOb <- function(x) is.null(x) | all(sapply(x, is.null))
 
@@ -187,211 +164,328 @@ rmNullObs <- function(x) {
   lapply(x, function(x) if (is.list(x)) rmNullObs(x) else x)
 }
 
-# Number of missing values #
-
 sumNA <- function(x) sum(is.na(x))
 
-# Clean environment
-RmAll <- function() rm(list=ls(pos = 1), pos=1)
-RmJunk <- function(){
-  if(length(ls(pos = 1))==0) stop("Nothing to be found in your environment.")
-  Fntions = .ls.objects(order.by = "Type")
-  Fntions = rownames(Fntions)[Fntions$Type=="function"]
-  rm(list=ls(pos = 1)[!ls(pos = 1)%in%Fntions], pos=1)
-  cat("#",rep("-", 18),"#\n")
-  cat("# Your environment has been cleaned!  #\n")
-  cat("#",rep("-", 18),"#\n")
+AdjOpenR <- function(Begin = cat("\n\nHello world!\n\n"), 
+                     End = cat("\n\nGoodbye!\n\n")) {
+  .First <<- function() Begin
+  .Last   <<- function() End
 }
 
+ObjectSize <- function(x) print(object.size(x), unit = "Mb")
 
 
-#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@#
-# FUNCTIONS FOR DESCRIPTIVE ANALYSES #
-#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@#
-descr.cont <- function(x, digits = options()$digits) paste0(round(mean(x,na.rm = T), digits),
-                                                            " (",round(sd(x,na.rm = T), digits),")")
-descr.median <- function(x, digits = options()$digits){
-  x   = as.numeric(x)
-  Res = paste0(round(median(x,na.rm = T), digits),
-               " (",round(range(x,na.rm = T)[1], digits),"-",
-               round(range(x,na.rm = T)[2], digits),")")
-  return(Res)
-}
-
-descr.medianIQR <- function(x, digits = options()$digits){
-  x   = as.numeric(x)
-  Res = paste0(round(median(x,na.rm = T), digits),
-               " (",round(quantile(x, 0.25, na.rm = T), digits),"-",
-               round(quantile(x, 0.75, na.rm = T), digits),")")
-  return(Res)
-}
-
-
-descr.median2 <- function(x){
-  x <- na.omit(as.numeric(x))
-  df <- cbind.data.frame("Median"=median(x),"Minimum"=min(x),"Maximum"=max(x),"Q1"=quantile(x,0.25),"Q3"=quantile(x,0.75))
-  rownames(df) <- ""
-  df
-}
-
-descr.cat <- function(x, Proportion = T, ...){
-  result <- cbind(table(x,...),round(prop.table(table(x,...)),3))
-  colnames(result) <- c("Frequency","Percentage")
-  if(any(is.na(rownames(result)))) rownames(result)[is.na(rownames(result))] <- "Missing"
-  rNames = rownames(result)
-  if(!Proportion){
-    result = data.frame("N (%)" = paste(result[,1]," (",result[,2]*100,"%)", sep=""), check.names = F)
-    rownames(result) = rNames
+WP <-
+  function(from.clip = TRUE, quotes = TRUE, copy2clip = interactive()) {
+    if (!from.clip) {
+      message("Please enter the path:\n\n")
+      path <- readline()
+    } else {
+      path <- readClipboard()
+    }
+    z <- chartr("\\", "/", path)
+    if (quotes) {
+      x <- paste0("\"", z, "\"")
+    } else {
+      x <- z
+    }
+    if(copy2clip){
+      writeClipboard(x)
+    }
+    return(z)
   }
-  result
-}
 
-dcat.outc <- function(var,by.var,data,PercName = "Percentage", Merge = F, digits = 3,
-                      AddMargins = F,
-                      ...){
-  argz <- as.list(match.call())[-1]
-  if(!is.data.frame(data)) stop("Must be dataframe")
-  AddArgz = as.list(substitute(list(...)))[-1L]
-  
-  data$var <- eval(argz$var,data)
-  data$by.var <- eval(argz$by.var,data)
-  results <- aggregate(data$var,list(data$by.var),descr.cat,...)
-  x.names <- colnames(aggregate(data$var,list(data$by.var),table,...)$x)
-  if(is.null(x.names)) x.names = "Var"
-  colnames(results$x) <- c(x.names,paste(PercName,x.names))
-  X <- results
-  X2 <- cbind(X[[ncol(X)]])
-  rownames(X2) <- X[,1]
-  if(AddMargins){
-    X2 = cbind(X2, addmargins(X2[,1:length(unique(data$var))], 2)[,length(unique(data$var)) + 1])
-    colnames(X2)[ncol(X2)] = "Total"
+ConvertPath <-
+  function(from.clip = TRUE, quotes = TRUE, copy2clip = interactive()) {
+    if (!from.clip) {
+      message("Please enter the path:\n\n")
+      path <- readline()
+    } else {
+      path <- readClipboard()
+    }
+    z <- chartr("\\", "/", path)
+    if (quotes) {
+      x <- paste0("\"", z, "\"")
+    } else {
+      x <- z
+    }
+    if(copy2clip){
+      writeClipboard(x)
+    }
+    return(z)
   }
-  if(Merge){
-    n = if(length(AddArgz)==0) length(na.omit(unique(data$var)))
-    else if(any(names(AddArgz)=="useNA") & AddArgz$useNA=="always") length(unique(data$var))
-    Merged = list()
-    for(i in 1:n) Merged[[i]] = data.frame(paste(X2[,i], " (", round(X2[,i+n],3)*100,"%)", sep=""))
-    Merged = do.call("cbind", Merged)
-    colnames(Merged) = x.names
-    rownames(Merged) = X[,1]
-    if(AddMargins) Merged = cbind(Merged, Total = X2[,ncol(X2)])
-    X2 = Merged
+
+
+LibraryM <- function(...) {
+  libs = as.list(substitute(list(...)))[-1L]
+  if(!is.character(libs)) {
+    if(length(libs[[1]]) > 1)
+      libs = sapply(substitute(libs)[-1], as.character)
+    else
+      libs = as.character(substitute(libs))
   }
-  X2
+  InstPkgs = installed.packages()
+  Inst = all(libs %in% InstPkgs)
+  if(!Inst)
+    lapply(libs[!libs %in% InstPkgs], install.packages)
+  lapply(libs, library, character.only = T)
 }
 
-dmed.outc <- function(var, by.var, data, AddMargins = F, digits = 2){
-  argz <- as.list(match.call())[-1]
-  if(!is.data.frame(data)) stop("Must be dataframe")
-  if(missing(data)) stop("Provide data frame")
-  if(missing(var)) stop("Provide argument for var")
-  if(missing(by.var)) stop("Provide argument for by.var")
+is.formula <- function(x) inherits(x,"formula")
+
+FactorToNumeric <- function(x) {
+  if(!is.factor(x))
+    stop("Provide variable of type factor.")
+  as.numeric(as.character(x))
+}
+
+hline <- function(x, ...) abline(h = x, ...)
+vline <- function(x, ...) abline(v = x, ...)
+
+ModelMatrixKeepNA <- function(myformula, df) {
+  if(!is.formula(myformula))
+    stop("Has to be of type formula.")
+  if(!is.data.frame(df))
+    stop("Has to be of type data.frame")
+  model.matrix(myformula, model.frame(myformula, df, na.action = function(x) x))
+}
+
+FindFile <- function(x, wd = getwd(), ...)
+  list.files(wd, full.names = T, ...)[grepl(x, list.files(wd, ...), fixed = T)]
+
+FixProfile <- function()
+  source('~/.Rprofile')
+
+GetRCodeWeb <- function(url, NameFile = "Code", FileExt = ".R",
+                        pathFile = getwd()) {
+  if(!"rvest" %in% names(sessionInfo()$otherPkgs))
+    library(rvest)
+  Error = tryCatch(read_html(url), error = function(e) T)
+  if(is.logical(Error))
+    stop("Unable to use read_html() on provided url.")
   
-  data$var <- eval(argz$var,data)
-  data$by.var <- eval(argz$by.var,data)
-  results <- aggregate(data$var,list(data$by.var),descr.median, digits = digits)
-  X <- results
-  X2 <- cbind(X[[ncol(X)]])
-  rownames(X2) <- X[,1]; colnames(X2) <- "Median (Range)"
-  if(AddMargins) X2 = rbind(X2, Total = descr.median(data$var, digits = digits))
-  X2
-}
-
-dmed2.outc <- function(var,by.var,data){
-  argz <- as.list(match.call())[-1]
-  if(!is.data.frame(data)) stop("Must be dataframe")
-  if(length(argz)!=3) stop("Provide all arguments of the function!")
+  iframe_link = url
+  code <- iframe_link %>% 
+    read_html() %>% 
+    html_nodes("pre") %>% 
+    html_text()
   
-  data$var <- eval(argz$var,data)
-  data$by.var <- eval(argz$by.var,data)
-  results <- aggregate(data$var,list(data$by.var),descr.median2)
-  X <- results
-  X2 <- cbind(X[[ncol(X)]])
-  rownames(X2) <- X[,1]; colnames(X2) <- c("Median","Minimum","Maximum","Q1","Q3")
-  X2
-}
-
-dcont.outc <- function(var,by.var,data, digits = options()$digits){
-  argz <- as.list(match.call())[-1]
-  if(!is.data.frame(data)) 
-    stop("Must be dataframe")
+  code <- iframe_link %>% 
+    read_html() %>% 
+    html_nodes("pre.r") %>% 
+    html_text()
   
-  data$var <- eval(argz$var,data)
-  data$by.var <- eval(argz$by.var,data)
-  results <- aggregate(data$var,list(data$by.var), descr.cont, digits = digits)
-  X <- results
-  X2 <- cbind(X[[ncol(X)]])
-  rownames(X2) <- X[,1]; colnames(X2) <- "Mean (Standard Deviation)"
-  X2
+  writeLines(code, con = paste0(pathFile, "/", NameFile, FileExt))
 }
 
-dmedIQR.outc <- function(var,by.var,data, digits = options()$digits){
-  argz <- as.list(match.call())[-1]
-  if(!is.data.frame(data))
-    stop("Must be dataframe")
-  
-  data$var <- eval(argz$var,data)
-  data$by.var <- eval(argz$by.var,data)
-  results <- aggregate(data$var,list(data$by.var), descr.medianIQR, digits = digits)
-  X <- results
-  X2 <- cbind(X[[ncol(X)]])
-  rownames(X2) <- X[,1]; colnames(X2) <- c("Median (IQR)")
-  X2
-}
-
-
-# name in dataframe
-name.df <- function(x,df,ignore.case=T){
-  if(!is.character(x)) stop("Must be a character variable")
+name.df <- function(x, df, ignore.case = T){
+  if(!is.character(x)) 
+    stop("Must be a character variable")
   names(df)[grepl(x,names(df),ignore.case = ignore.case)]
 }
 
 # Combine elements in list to dataframe
 rbindList = function(.list, VarNamesOnce = F){
-  if(!inherits(.list, "list")) stop("Object must be of type list")
-  if(length(unique(lapply(.list, ncol)))!=1) stop("The number of columns of the different objects are not the same.")
+  if (!inherits(.list, "list"))
+    stop("Object must be of type list")
+  if (length(unique(lapply(.list, ncol))) != 1)
+    stop("The number of columns of the different objects are not the same.")
   VarNames = NULL
-  if(!VarNamesOnce) VarNames = rep(names(.list), lapply(.list, function(x) if(is.null(dim(x))) length(x) else nrow(x)))
-  else for(i in names(.list)) VarNames = c(VarNames, i, rep(NA, nrow(.list[[i]]) - 1))
-  if(is.null(dim(.list[[1]]))) CombinedList = do.call("c", .list)
-  else CombinedList = do.call("rbind", .list)
-  if(is.null(dim(.list[[1]]))){
+  if (!VarNamesOnce)
+    VarNames = rep(names(.list), lapply(.list, function(x)
+      if (is.null(dim(x)))
+        length(x)
+      else
+        nrow(x)))
+  else
+    for (i in names(.list)) {
+      VarNames = c(VarNames, i, rep(NA, if(is.null(dim(.list[[i]]))) length(.list[[i]]) - 1 else nrow(.list[[i]]) - 1))
+    }
+  if (is.null(dim(.list[[1]])))
+    CombinedList = do.call("c", .list)
+  else
+    CombinedList = do.call("rbind", .list)
+  if (is.null(dim(.list[[1]]))) {
     Res = cbind.data.frame(Variable = VarNames, CombinedList, row.names = NULL)
-  }else{
-    Res = if(all(unlist(lapply(.list, nrow))==1)) cbind.data.frame(Variable = VarNames,
-                                                                   Level = unname(unlist(lapply(.list, function(x) rownames(x)))),
-                                                                   CombinedList, row.names = NULL)
-    else cbind.data.frame(Variable = VarNames, Level = unname(unlist(lapply(.list, function(x) rownames(x)))),
-                          CombinedList)
+  } else{
+    Res = if (all(unlist(lapply(.list, nrow)) == 1))
+      cbind.data.frame(
+        Variable = VarNames,
+        Level = unname(unlist(lapply(.list, function(x)
+          rownames(x)))),
+        CombinedList,
+        row.names = NULL
+      )
+    else
+      cbind.data.frame(Variable = VarNames,
+                       Level = unname(unlist(lapply(.list, function(x)
+                         rownames(x)))),
+                       CombinedList)
     rownames(Res) = NULL
   }
   return(Res)
 }
 
-#@@@@@@@@@@@@@#
-# PC COMMANDS #
-#@@@@@@@@@@@@@#
-
-pc.hibernate <- function() system('shutdown -h')
-pc.shutdown <- function() system('shutdown -s')
-pc.restart <- function() system('shutdown -r')
-open.firefox <- function() system('open firefox.exe')
-open.word <- function() system('open winword.exe')
-open.excel <- function() system('open excel.exe')
-close.firefox <- function() system('taskkill /F firefox.exe')
-close.word <- function() system('taskkill /IM winword.exe')
-close.excel <- function() system('taskkill /IM excel.exe')
-close.drive <- function() system('taskkill /F /IM googledrivesync.exe')
+Prev <- function(x) {
+  if(is.factor(x))
+    x = FactorToNumeric(x)
+  sum(x) / length(x)
+}
 
 
-#@@@@@@@@@@@@@@@@@@@@@@@@@@@@#
-# Correlation transformation #
-#@@@@@@@@@@@@@@@@@@@@@@@@@@@@#
-corr.transf <- function(x) (1 / (sqrt(length(x) - 1))) * scale(x)
+#### 1.3 Functions for descriptive analysis ####
 
-#@@@@@@@@@@@@@@@@@@@@@@@@#
-# Fix for viewing tables #
-#@@@@@@@@@@@@@@@@@@@@@@@@#
+#### 1.3.1 New functions ####
+print.descr <- function(x, ...) {
+  print(x$Descriptives, row.names = F)
+}
+DescrContinuous <- function(x, Type = c("MeanSD", "MedianRange", "MedianIQR", "MedianAll"), 
+                            digits = options()$digits) {
+  if(!is.numeric(x))
+    stop("Only numeric variables are allowed.")
+  Q1 <- function(x) quantile(x, 0.25)
+  Q3 <- function(x) quantile(x, 0.75)
+  Type = match.arg(Type)
+  Res = switch(Type,
+               MeanSD = paste0(round(mean(x, na.rm = T), digits),
+                               " (", round(sd(x, na.rm = T), digits), ")"),
+               MedianRange = paste0(round(median(x, na.rm = T), digits),
+                                    " (",
+                                    round(range(x, na.rm = T)[1], digits),
+                                    " to ",
+                                    round(range(x, na.rm = T)[2], digits),
+                                    ")"),
+               MedianIQR = paste0(
+                 round(median(x, na.rm = T), digits),
+                 " (",
+                 round(quantile(x, 0.25, na.rm = T), digits),
+                 " to ",
+                 round(quantile(x, 0.75, na.rm = T), digits),
+                 ")"
+               ),
+               MedianAll = do.call("cbind", lapply(list(median, min, max, Q1, Q3), function(f) f(x)))
+               )
+  Res = data.frame(Res, row.names = NULL)
+  colnames(Res) = switch(Type,
+                         MeanSD = "Mean (SD)",
+                         MedianRange = "Median (min to max)",
+                         MedianIQR = "Median (Q1 to Q3)",
+                         MedianAll = c("Median", "Min", "Max", "Q1", "Q3"))
+  Res = list(Descriptives = Res)
+  class(Res) = "descr"
+  Res
+}
+
+DescrCat <- function(x, Proportion = T, digits = options()$digits, ...) {
+  Res           = cbind(table(x, ...), round(prop.table(table(x, ...)), digits))
+  colnames(Res) = c("Frequency", "Percentage")
+  if(any(is.na(rownames(Res))))
+    rownames(Res)[is.na(rownames(Res))] <- "Missing"
+  rNames = rownames(Res)
+  if(!Proportion) {
+    Res = data.frame("N (%)" = paste0(Res[, 1], " (", Res[, 2] * 100, "%)"),
+                     check.names = F)
+    rownames(Res) = rNames
+  }
+  Res = list(Descriptives = Res)
+  class(Res) = "descr"
+  Res
+}
+
+DescrContBy <- function(Var, By, Df, Type = c("MeanSD", "MedianRange", "MedianIQR", "MedianAll"),
+                        AddMargins = F, digits = options()$digits) {
+  Argz = as.list(match.call())[-1]
+  if(!is.data.frame(Df))
+    stop("Must be of type data.frame")
+  
+  Df$var = eval(Argz$Var, Df)
+  Df$by  = eval(Argz$By, Df)
+  Res = plyr::ddply(Df, .(by), function(x) DescrContinuous(x$var, Type = Type, digits = digits)$Descriptives)
+  if(AddMargins) {
+    AddRes = DescrContinuous(Df$var, Type = Type, digits = digits)$Descriptives
+    Res = rbind.data.frame(Res,
+                           data.frame(by = "Total", AddRes, check.names = F))
+  }
+  colnames(Res)[1] = as.character(substitute(By))
+  Res = list(Descriptives = Res)
+  class(Res) = "descr"
+  Res
+}
+
+DescrCatBy <- function(Var, By, Df, Percentage = c("none", "row", "col", "all"), AppendPerc = T,
+                       AddMargins = T, digits = options()$digits, ...) {
+  Argz = as.list(match.call())[-1]
+  if(!is.data.frame(Df))
+    stop("Must be of type data.frame")
+  Percentage = match.arg(Percentage)
+  if(!is.logical(AppendPerc))
+    stop("Argument AppendPerc has to be of type logical.")
+  if(!is.logical(AddMargins))
+    stop("Argument Addmargins has to be of type logical.")
+  
+  Df$var = eval(Argz$Var, Df)
+  Df$by  = eval(Argz$By, Df)
+  Tab = table(Df$var, Df$by, ...)
+  if(Percentage != "none") {
+    Tab = 
+      if(Percentage == "row") {
+        Rtot   = rowSums(Tab)
+        Rperc  = round(sweep(Tab, 1, Rtot, FUN = "/"), digits)
+        NewTab = 
+          if(AppendPerc){
+            Mat = matrix(paste0(Tab, " (", Rperc, "%)"), nrow(Tab), ncol(Tab))
+            colnames(Mat) = colnames(Tab)
+            rownames(Mat) = rownames(Tab)
+            Mat
+          } else {
+            Mat = cbind(Tab, Rperc)
+            colnames(Mat) = paste(rep(c("Frequency", "Percentage"), each = ncol(Tab)), colnames(Tab))
+            Mat
+          }
+        if(AddMargins)
+          NewTab = cbind.data.frame(NewTab, "Total"= Rtot)
+        NewTab
+      } else if(Percentage == "col") {
+        Ctot   = colSums(Tab)
+        Cperc  = round(sweep(Tab, 2, Ctot, FUN = "/"), digits)
+        NewTab = 
+          if(AppendPerc){
+            Mat = matrix(paste0(Tab, " (", Cperc, "%)"), nrow(Tab), ncol(Tab))
+            colnames(Mat) = colnames(Tab)
+            rownames(Mat) = rownames(Tab)
+            Mat
+          } else {
+            Mat = rbind(Tab, Cperc)
+            rownames(Mat) = paste(rep(c("Frequency", "Percentage"), each = nrow(Tab)), rownames(Tab))
+            Mat
+          }
+        if(AddMargins)
+          NewTab = rbind.data.frame(NewTab, "Total"= Ctot, stringsAsFactors = F)
+        NewTab
+      } else {
+        PercTab = round(Tab / sum(Tab), digits)
+        Mat = as.data.frame(matrix(paste0(Tab, " (", PercTab, "%)"), nrow(Tab), ncol(Tab)),
+                            stringsAsFactors = F)
+        colnames(Mat) = colnames(Tab)
+        rownames(Mat) = rownames(Tab)
+        NewTab = 
+          if (AddMargins) {
+            NewTab = rbind.data.frame(Mat, "Total" = colSums(Tab))
+            NewTab = cbind.data.frame(NewTab, "Total" = c(rowSums(Tab), sum(Tab)))
+            NewTab
+          } else {
+            Mat
+          }
+        NewTab
+      }
+  }
+  Tab
+}
+
+
+#### 1.4 Fixes ####
+
+#### 1.4.1 Kable and htmlTable ####
 view_kable <- function(x, viewHtml = F,...){
   if(!any(grepl("knitr", names(sessionInfo()$otherPkgs)))) require(knitr, quietly = T)
   tab <- paste(capture.output(kable(x, ...)), collapse = '\n')
@@ -409,13 +503,8 @@ view_htmlTable <- function(x, viewHtml = F,...){
   if(!viewHtml) rstudioapi::viewer(tf) else shell(paste("start chrome.exe ", tf))
 }
 
-#%%%%%%%%%%%%%%%%%%%%%%%%#
-# Calculating statistics #
-#%%%%%%%%%%%%%%%%%%%%%%%%#
-
-#~~ AUC ~~#
+#### 1.5 Calculating C-index ####
 # C++ function can be given on request
-
 CindexOld <- function(p, y, data)
 {
   if(missing(data))
@@ -450,16 +539,3 @@ CindexOld <- function(p, y, data)
   concord.measure = PercentConcordance / (PercentConcordance + PercentDiscordance + PercentTied)
   return(concord.measure)
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
