@@ -345,8 +345,8 @@ DescrContinuous <- function(x, Type = c("MeanSD", "MedianRange", "MedianIQR", "M
     stop("Only numeric variables are allowed.")
   if(anyNA(x))
     warning(paste0(sumNA(x), " missing observations were detected and removed."))
-  Q1 <- function(x) quantile(x, 0.25)
-  Q3 <- function(x) quantile(x, 0.75)
+  Q1 <- function(x, ...) quantile(x, 0.25, ...)
+  Q3 <- function(x, ...) quantile(x, 0.75, ...)
   Type = match.arg(Type)
   Res = switch(Type,
                MeanSD = paste0(round(mean(x, na.rm = T), digits),
