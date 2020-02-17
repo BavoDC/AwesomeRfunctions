@@ -343,6 +343,8 @@ DescrContinuous <- function(x, Type = c("MeanSD", "MedianRange", "MedianIQR", "M
                             digits = options()$digits) {
   if(!is.numeric(x))
     stop("Only numeric variables are allowed.")
+  if(anyNA(x))
+    warning(paste0(sumNA(x), " missing observations were detected and removed."))
   Q1 <- function(x) quantile(x, 0.25)
   Q3 <- function(x) quantile(x, 0.75)
   Type = match.arg(Type)
@@ -363,7 +365,7 @@ DescrContinuous <- function(x, Type = c("MeanSD", "MedianRange", "MedianIQR", "M
                  round(quantile(x, 0.75, na.rm = T), digits),
                  ")"
                ),
-               MedianAll = do.call("cbind", lapply(list(median, min, max, Q1, Q3), function(f) f(x)))
+               MedianAll = do.call("cbind", lapply(list(median, min, max, Q1, Q3), function(f) f(x, na.rm = T)))
                )
   Res = data.frame(Res, row.names = NULL)
   colnames(Res) = switch(Type,
