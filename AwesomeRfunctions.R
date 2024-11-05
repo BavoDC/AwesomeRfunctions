@@ -96,7 +96,7 @@ RmType <- function(Types, AdjOpenMessage = F, Keep = NULL,
   ObjEnv  = .ls.objects()
   if(!any(ObjEnv$Type %in% Types))
     warning(paste0("No objects of class ", Types, " found."))
-  
+
   RmObj   = rownames(ObjEnv[ObjEnv$Type %in% Types, ])
   if(!is.null(Keep))
     RmObj = RmObj[!RmObj %in% Keep]
@@ -166,7 +166,7 @@ rmNullObs <- function(x) {
 
 sumNA <- function(x) sum(is.na(x))
 
-AdjOpenR <- function(Begin = cat("\n\nHello world!\n\n"), 
+AdjOpenR <- function(Begin = cat("\n\nHello world!\n\n"),
                      End = cat("\n\nGoodbye!\n\n")) {
   .First <<- function() Begin
   .Last   <<- function() End
@@ -263,23 +263,23 @@ GetRCodeWeb <- function(url, NameFile = "Code", FileExt = ".R",
   Error = tryCatch(read_html(url), error = function(e) T)
   if(is.logical(Error))
     stop("Unable to use read_html() on provided url.")
-  
+
   iframe_link = url
-  code <- iframe_link %>% 
-    read_html() %>% 
-    html_nodes("pre") %>% 
+  code <- iframe_link %>%
+    read_html() %>%
+    html_nodes("pre") %>%
     html_text()
-  
-  code <- iframe_link %>% 
-    read_html() %>% 
-    html_nodes("pre.r") %>% 
+
+  code <- iframe_link %>%
+    read_html() %>%
+    html_nodes("pre.r") %>%
     html_text()
-  
+
   writeLines(code, con = paste0(pathFile, "/", NameFile, FileExt))
 }
 
 name.df <- function(x, df, ignore.case = T){
-  if(!is.character(x)) 
+  if(!is.character(x))
     stop("Must be a character variable")
   names(df)[grepl(x,names(df),ignore.case = ignore.case)]
 }
@@ -339,7 +339,7 @@ Prev <- function(x) {
 print.descr <- function(x, ...) {
   print(x$Descriptives, row.names = F)
 }
-DescrContinuous <- function(x, Type = c("MeanSD", "MedianRange", "MedianIQR", "MedianAll"), 
+DescrContinuous <- function(x, Type = c("MeanSD", "MedianRange", "MedianIQR", "MedianAll"),
                             digits = options()$digits) {
   if(!is.numeric(x))
     stop("Only numeric variables are allowed.")
@@ -399,7 +399,7 @@ DescrContBy <- function(Var, By, Df, Type = c("MeanSD", "MedianRange", "MedianIQ
   Argz = as.list(match.call())[-1]
   if(!is.data.frame(Df))
     stop("Must be of type data.frame")
-  
+
   Df$var = eval(Argz$Var, Df)
   Df$by  = eval(Argz$By, Df)
   Res = plyr::ddply(Df, .(by), function(x) DescrContinuous(x$var, Type = Type, digits = digits)$Descriptives)
@@ -424,16 +424,16 @@ DescrCatBy <- function(Var, By, Df, Percentage = c("none", "row", "col", "all"),
     stop("Argument AppendPerc has to be of type logical.")
   if(!is.logical(AddMargins))
     stop("Argument Addmargins has to be of type logical.")
-  
+
   Df$var = eval(Argz$Var, Df)
   Df$by  = eval(Argz$By, Df)
   Tab = table(Df$var, Df$by, ...)
   if(Percentage != "none") {
-    Tab = 
+    Tab =
       if(Percentage == "row") {
         Rtot   = rowSums(Tab)
         Rperc  = round(sweep(Tab, 1, Rtot, FUN = "/"), digits)
-        NewTab = 
+        NewTab =
           if(AppendPerc){
             Mat = matrix(paste0(Tab, " (", Rperc, "%)"), nrow(Tab), ncol(Tab))
             colnames(Mat) = colnames(Tab)
@@ -450,7 +450,7 @@ DescrCatBy <- function(Var, By, Df, Percentage = c("none", "row", "col", "all"),
       } else if(Percentage == "col") {
         Ctot   = colSums(Tab)
         Cperc  = round(sweep(Tab, 2, Ctot, FUN = "/"), digits)
-        NewTab = 
+        NewTab =
           if(AppendPerc){
             Mat = matrix(paste0(Tab, " (", Cperc, "%)"), nrow(Tab), ncol(Tab))
             colnames(Mat) = colnames(Tab)
@@ -470,7 +470,7 @@ DescrCatBy <- function(Var, By, Df, Percentage = c("none", "row", "col", "all"),
                             stringsAsFactors = F)
         colnames(Mat) = colnames(Tab)
         rownames(Mat) = rownames(Tab)
-        NewTab = 
+        NewTab =
           if (AddMargins) {
             NewTab = rbind.data.frame(Mat, "Total" = colSums(Tab))
             NewTab = cbind.data.frame(NewTab, "Total" = c(rowSums(Tab), sum(Tab)))
@@ -540,4 +540,75 @@ CindexOld <- function(p, y, data)
   PercentTied = (sum(ties) / Pairs) * 100
   concord.measure = PercentConcordance / (PercentConcordance + PercentDiscordance + PercentTied)
   return(concord.measure)
+}
+
+
+#### 1.6 geom_braces: fix manuscript fraud simulator ####
+if("ggbrace" %in% rownames(installed.packages())) {
+  geom_brace <- function(mapping = NULL, data = NULL, inherit.aes=TRUE, #mapping-related
+                         inherit.data=TRUE,
+                         rotate=0, mid=NULL, bending=NULL, npoints=100, #orientation and shape
+                         labelsize = 0, labeldistance=NULL, labelrotate=0, #labels
+                         textORlabel="text",
+                         ...){
+    #================#
+    #==preparations==#
+    #================#
+    #if user provides custom x and y, data (from ggplot main function) must be set to NULL and inherit.aes to FALSE.
+    #otherwise ggplot will try to match the custom x and y to the data provided before which will have a different size, ending in an error
+    if(!inherit.data){
+      data <- data.frame()
+      inherit.aes <- FALSE
+    }
+    #force mid between 0.25 and 0.75
+    mid <- ifelse(mid>0.75, 0.75, ifelse(mid<0.25, 0.25, mid))
+    #up and right will be positive; down and left will be negative. The direction variable will be a shortcut to determine how the brace and text is placed
+    direction <- -sign(rotate/90-1.5)
+
+    #=======================#
+    #==label for the brace==#
+    #=======================#
+    added_labels <- NULL #in case there is no label, the actual brace will be combined with NULL instead of something that doesn't exist
+    if(labelsize>0){
+      #hjust and vjust of the text depend on the brace rotation and the label rotation
+      if(labelrotate==90){
+        txtvjust <- switch(rotate/90+1, 0.5, 1, 0.5, 0)
+        txthjust <- switch(rotate/90+1, 0, 0.5, 1, 0.5)
+      }else if(labelrotate==270){
+        txtvjust <- switch(rotate/90+1, 0.5, 0, 0.5, 1)
+        txthjust <- switch(rotate/90+1, 1, 0.5, 0, 0.5)
+      }else{
+        txtvjust <- switch(rotate/90 +1, 0, 0.5, 1, 0.5)
+        txthjust <- switch(rotate/90 +1, 0.5, 0, 0.5, 1)
+      }
+      #create ggplot layer. StatBraceLabel will do the calculations where to put the text (calling .coordCorrection)
+      added_labels <- ggplot2::layer(
+        stat = StatBraceLabel,
+        data = data, mapping = mapping, geom = textORlabel,
+        position = "identity", show.legend = FALSE, inherit.aes = inherit.aes,
+        params = list(vjust=txtvjust, hjust=txthjust, size=labelsize, angle=labelrotate,
+                      rotate=rotate, bending=bending, npoints=npoints, mid=mid,
+                      labeldistance=labeldistance,
+                      direction=direction, outside=FALSE, ...)
+      )
+    }
+
+    #====================#
+    #==the brace itself==#
+    #====================#
+    mapping$label <- NULL #set this to null to avoid a message from the next ggplot layer (which has no label option)
+    #create ggplot layer. StatBrace will do the calculations where and how to draw the brace (calling .coordCorrection and then .seekBrace)
+    outbrace <- ggplot2::layer(
+      stat = StatBrace,
+      data = data, mapping = mapping, geom = "path",
+      position = "identity", show.legend = FALSE, inherit.aes = inherit.aes,
+      params = list(rotate=rotate, bending=bending, npoints=npoints, mid=mid,
+                    outside=FALSE, direction=direction, ...)
+    )
+
+    outbrace <- c(outbrace, added_labels)
+
+    return(outbrace)
+  }
+  environment(geom_brace) = as.environment(environment(ggbrace::stat_brace))
 }
